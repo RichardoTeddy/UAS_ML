@@ -1,6 +1,6 @@
-#-----------------------------------
+# -----------------------------------
 # GLOBAL FEATURE EXTRACTION
-#-----------------------------------
+# -----------------------------------
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
@@ -9,79 +9,75 @@ import cv2
 import os
 import h5py
 
-#--------------------
+# --------------------
 # tunable-parameters
-#--------------------
-images_per_class = 80
-fixed_size       = tuple((500, 500))
-train_path       = "dataset/train"
-h5_data          = 'output/data.h5'
-h5_labels        = 'output/labels.h5'
-bins             = 8
+# --------------------
+images_per_class = 80  # Jumlah gambar per kelas
+fixed_size = tuple((500, 500))  # Ukuran gambar yang telah ditetapkan
+train_path = "dataset/train"  # Path untuk dataset latihan
+h5_data = 'output/data.h5'  # File untuk menyimpan data fitur
+h5_labels = 'output/labels.h5'  # File untuk menyimpan label
+bins = 8  # Jumlah bin untuk histogram warna
 
-# feature-descriptor-1: Hu Moments
+# deskriptor-fitur-1: Hu Moments
+
+
 def fd_hu_moments(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     feature = cv2.HuMoments(cv2.moments(image)).flatten()
     return feature
 
-# feature-descriptor-2: Haralick Texture
+# deskriptor-fitur-2: Haralick Texture
+
+
 def fd_haralick(image):
-    # convert the image to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # compute the haralick texture feature vector
     haralick = mahotas.features.haralick(gray).mean(axis=0)
-    # return the result
     return haralick
 
-# feature-descriptor-3: Color Histogram
+# deskriptor-fitur-3: Histogram Warna
+
+
 def fd_histogram(image, mask=None):
-    # convert the image to HSV color-space
     image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    # compute the color histogram
-    hist  = cv2.calcHist([image], [0, 1, 2], None, [bins, bins, bins], [0, 256, 0, 256, 0, 256])
-    # normalize the histogram
+    hist = cv2.calcHist([image], [0, 1, 2], None, [
+                        bins, bins, bins], [0, 256, 0, 256, 0, 256])
     cv2.normalize(hist, hist)
-    # return the histogram
     return hist.flatten()
 
-# get the training labels
+
+# Mengambil label pelatihan dari direktori train_path
 train_labels = os.listdir(train_path)
 
-# sort the training labels
+# Mengurutkan label pelatihan
 train_labels.sort()
 print(train_labels)
 
-# empty lists to hold feature vectors and labels
+# List kosong untuk menyimpan vektor fitur global dan label
 global_features = []
-labels          = []
+labels = []
 
-# loop over the training data sub-folders
+# Perulangan untuk setiap sub-folder data latihan
 for training_name in train_labels:
-    # join the training data path and each species training folder
     dir = os.path.join(train_path, training_name)
-
-    # get the current training label
     current_label = training_name
 
-    # loop over the images in each sub-folder
-    for x in range(1,images_per_class+1):
-        # get the image file name
+    # Perulangan untuk setiap gambar di setiap sub-folder
+    for x in range(1, images_per_class + 1):
         file = dir + "/" + str(x) + ".jpg"
-
-        # read the image and resize it to a fixed-size
         image = cv2.imread(file)
         image = cv2.resize(image, fixed_size)
 
         ####################################
-        # Global Feature extraction
+        # Ekstraksi fitur global
         ####################################
+
         fv_hu_moments = fd_hu_moments(image)
-        fv_haralick   = fd_haralick(image)
-        fv_histogram  = fd_histogram(image)
+        fv_haralick = fd_haralick(image)
+        fv_histogram = fd_histogram(image)
 
         ###################################
-        # Concatenate global features
+        # Menggabungkan fitur global
         ###################################
         global_feature = np.hstack([fv_histogram, fv_haralick, fv_hu_moments])
 
@@ -93,27 +89,28 @@ for training_name in train_labels:
 
 print("[STATUS] completed Global Feature Extraction...")
 
-# get the overall feature vector size
-print("[STATUS] feature vector size {}".format(np.array(global_features).shape))
+# Mendapatkan ukuran vektor fitur secara keseluruhan
+print("[STATUS] feature vector size {}".format(
+    np.array(global_features).shape))
 
-# get the overall training label size
+# Mendapatkan ukuran label pelatihan secara keseluruhan
 print("[STATUS] training Labels {}".format(np.array(labels).shape))
 
-# encode the target labels
+# Mengkodekan label target
 targetNames = np.unique(labels)
-le          = LabelEncoder()
-target      = le.fit_transform(labels)
+le = LabelEncoder()
+target = le.fit_transform(labels)
 print("[STATUS] training labels encoded...")
 
-# scale features in the range (0-1)
-scaler            = MinMaxScaler(feature_range=(0, 1))
+# Penskalaan fitur dalam rentang (0-1)
+scaler = MinMaxScaler(feature_range=(0, 1))
 rescaled_features = scaler.fit_transform(global_features)
 print("[STATUS] feature vector normalized...")
 
 print("[STATUS] target labels: {}".format(target))
 print("[STATUS] target labels shape: {}".format(target.shape))
 
-# save the feature vector using HDF5
+# Menyimpan vektor fitur menggunakan HDF5
 h5f_data = h5py.File(h5_data, 'w')
 h5f_data.create_dataset('dataset_1', data=np.array(rescaled_features))
 
